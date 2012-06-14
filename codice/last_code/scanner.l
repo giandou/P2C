@@ -1,34 +1,45 @@
 %{
 
 /**
-+-----------------------------------------------------------------------+
-| P2C -- scanner.l 							|
-+-----------------------------------------------------------------------+
-|									|
-|  Autori: 	Vito Manghisi 						|
-| 		Gianluca Grasso						|
-+-----------------------------------------------------------------------+
-*	
-* Input file per Flex, generatore dello scanner per il traduttore da PHP a C
-*
-*/
+ * +-----------------------------------------------------------------------+
+ * | P2C - scanner.l                                                       |
+ * +-----------------------------------------------------------------------+
+ * |                                                                       |
+ * |  Autori: Vito Manghisi                                                |
+ * |          Gianluca Grasso                                              |
+ * +-----------------------------------------------------------------------+
+ *	
+ * Input file per Flex, generatore dello scanner per il traduttore da PHP a C
+ *
+ */
 
 #include <stdio.h>
 #include "parser.h"
 
-/** Funzione che aggiunge un terminatore '\0' dopo una stringa */
-char * nullTerminateTheLexem(char * literal, const int offset, const int lenght){
-  char * str = (char *)malloc(sizeof(char)*((lenght-offset)+1));
-  int i = offset;
-  while(i <= (lenght-offset)){
-    str[i-offset] = literal[i++];
+/** Funzione che effettua un ritaglio di una stringa 
+  * ed aggiunge un terminatore '\0'
+  *
+  * Argomenti:
+  * 	literal: la stringa da manipolare
+  * 	start: intero che indica l'offset iniziale dal quale copiare
+  *	end: intero che indica la lunghezza da considerare
+  * Ritorna una nuova copia della stringa ritagliata secondo i parametri
+  */
+char * nullTerminateTheLexem(char * literal, const int start, const int end){
+  char * str = (char *)malloc(sizeof(char)*((end-start)+1));
+  int i = start;
+  while(i <= (end-start)){
+    str[i-start] = literal[i++];
   }
-  str[lenght-offset] = '\0';
-  char * dup = strdup(str);
-  return dup;
+  str[end-start] = '\0';
+  return str;
 }
 
-/** Funzione che effettua l'escape dei newline in una stringa */
+/** Funzione che effettua l'escape dei newline in una stringa 
+ *  Parametri:
+ *	str: la stringa da controllare
+ *  Ritorna una copia con i newline escaped
+ */
 char * escapeNewline(char * str){
   if(yy_flex_debug)
     printf("--Esecuzione della funzione escapeNewline sulla stringa %s: \n", str);
@@ -119,14 +130,9 @@ int comment_start_line = 0;
 
 /** Definizione della regex che matcha uno o più digit numeriche*/
 LNUM [0-9]+
-/** Definizione della regex che matcha uno o più digit numeriche con segno*/
-SNUM [-+]{1}[0-9]+
-/** Definizione della regex che matcha una floating del tipo [n].n oppure n.[n], 
+/** Definizione della regex che matcha una floating del tipo [+|-][n].n oppure [+|-]n.[n], 
     dove n è un intero da 0 a 9, e [] indica opzionalità. */
 DNUM ([0-9]*[\.][0-9]+)|([0-9]+[\.][0-9]*)
-/** Definizione della regex che matcha una floating negativa nella forma +[n].n oppure -n.[n] 
-    dove n è un intero da 0 a 9 e [] indicano opzionalità. */
-NDNUM ([-+]{1})([0-9]*[\.][0-9]+)|([0-9]+[\.][0-9]*)
 /** Definizione della regex per le label costanti nella forma _ALFA[ALFA|0-9], cioè che iniziano con un underscore 
     seguito da almeno un letterale char maiuscolo, seguito opzionalmente da letterali maiuscoli o numeri da 0 a 9*/
 CONST_LABEL ("_")([A-Z][A-Z0-9_]*)("_")
@@ -142,7 +148,7 @@ TOKENS [;:,.\[\]()|^&+-/*=%!~$<>?@]
 /** Definizione regex per token quali [,],{,},$ che possono comparire in una stringa */
 ENCAPSED_TOKENS [\[\]{}$]
 /** Definizione per letterali validi all'interno di una stringa */
-ESCAPED_AND_WHITESPACE [\\\n\t\r #'.:;,()|^&+-/*=%!~<>?@]+
+ESCAPED_AND_WHITESPACE [\\\n\t\r #'.:;,() |^&+-/*=%!~<>?@]+
 /** Definizione per letterali costituiti da qualsiasi carattere alfanumerico o newline */
 ANY_CHAR (.|[\n])
 /** Definizione per terminatori di linea Unix o Windows */
@@ -150,8 +156,9 @@ NEWLINE ("\r"|"\n"|"\r\n")
 
 %%
 
+ /** Regola per il terminale per la definizione di funzioni PHP */  
 <ST_IN_SCRIPTING>"function" {
-	return T_FUNCTION;
+  return T_FUNCTION;
 }
 
  /** Regola per il terminale if */  
@@ -308,48 +315,24 @@ NEWLINE ("\r"|"\n"|"\r\n")
 }
  /** Regola per il terminale di apertira dello scope o blocco */
 <ST_IN_SCRIPTING>"{" {
-  /* yy_push_state(ST_IN_SCRIPTING); 
-
-    TODO: rimossa in quanto si è già nello stato ST_IN_SCRIPTIG
-
-  */
   return '{';
 }
 
  /** Regola per il terminale di chiusura dello scope o blocco */
 <ST_IN_SCRIPTING>"}" {
-  /* This is a temporary fix which is dependant on flex and it's implementation 
-  if ( yy_start_stack_ptr ) {
-  yy_pop_state( );
-  }
-    TODO: funziona anche senza fix
-  */
   return '}';
 }
 
  /** Regola per non terminali costituiti da interi */
-<ST_IN_SCRIPTING,ST_DOUBLE_QUOTES>{LNUM} {
+<ST_IN_SCRIPTING>{LNUM} {
   yylval.id = nullTerminateTheLexem(yytext,0,yyleng);
   return T_LNUMBER;
-}
-
- /** Regola per non terminali costituiti da interi con segno */
-<ST_IN_SCRIPTING>{SNUM} {
-  yylval.id = nullTerminateTheLexem(yytext,0,yyleng);
-/*printf("\n il S_LNUMBER è :%s \n", yylval.id);*/
-  return T_SNUMBER;
 }
 
   /** Regola per numeri decimali */
 <ST_IN_SCRIPTING>{DNUM} {
   yylval.id = nullTerminateTheLexem(yytext,0,yyleng);
   return T_DNUMBER;
-}
-
- /** Regola per decimali negativi*/
-<ST_IN_SCRIPTING>{NDNUM} {
-  yylval.id = nullTerminateTheLexem(yytext,0,yyleng);
-  return T_SDNUMBER;
 }
 
  /** Regola per identificare l'inizio di uno script PHP */
@@ -370,13 +353,6 @@ NEWLINE ("\r"|"\n"|"\r\n")
  /** Regola per identificare una variabile */
 <ST_IN_SCRIPTING,ST_DOUBLE_QUOTES>"$"{LABEL} {
   yylval.id = ( char * )strdup( yytext + 1 );
-  return T_VARIABLE;
-}
- /** Regola per identificare una variabile mal definita */
-<ST_IN_SCRIPTING,ST_DOUBLE_QUOTES>"$"[0-9]{LABEL} {
-  /*Nel caso in cui si digiti erroneamente un numero dopo il $, parte una correzione automatica.*/
-  printf("\033[01;34mRiga: %i. CORREZIONE LESSICALE: e' stato corretto il nome della variabile \"%s\".\033[00m\n", yylineno, ( char * )strdup( yytext + 1 ) );
-  yylval.id = ( char * )strdup( yytext + 2 );
   return T_VARIABLE;
 }
 
@@ -428,13 +404,14 @@ NEWLINE ("\r"|"\n"|"\r\n")
     }
   }
 }
+
  /** Regola per identificare l'avvio di un commento in linea */
 <ST_IN_SCRIPTING>"#"|"//" {
   BEGIN(ST_ONE_LINE_COMMENT);
   yymore();
 }
 
- /** Regola per escapare i letterali speciali PHP in un commento in linea */
+ /** Regola per l'escape dei letterali speciali PHP in un commento in linea */
 <ST_ONE_LINE_COMMENT>"?"|">" {
   yymore();
 }
@@ -454,10 +431,10 @@ NEWLINE ("\r"|"\n"|"\r\n")
   }
 }
 
- /** Regola per identificare il newline in un commento in linea */
+ /** Regola per il newline in un commento in linea */
 <ST_ONE_LINE_COMMENT>{NEWLINE} {
-BEGIN(ST_IN_SCRIPTING);
-lineno++;
+  BEGIN(ST_IN_SCRIPTING);
+  lineno++;
 }
 
  /** Regola per escapare il terminatore script PHP in un commento in linea */
@@ -494,64 +471,36 @@ lineno++;
   BEGIN(ST_IN_SCRIPTING);
 }
 
- /** Regola ignorare '*' in un commento multilinea */
+ /** Regola per ignorare '*' in un commento multilinea */
 <ST_COMMENT,ST_DOC_COMMENT>"*" {
   yymore();
 }
 
  /** Regola identificare una costante tra apici */
 <ST_IN_SCRIPTING>([']({CONST_LABEL})[']) {
-  /*elimina i singoli apici, restituendo il nome della costante.*/
-  char *s = ( char * )malloc( ( strlen( yytext ) - 1 )*sizeof( char ) );
-  int j = 0;
-  int i;
-  for( i = 1; i < strlen( yytext ) - 1; i++) {
-    s[j] = yytext[i];
-    j++;
-  }
-  s[strlen( s )] = '\0';
-  yylval.id = s;
+  yylval.id = nullTerminateTheLexem(yytext, 1 , yyleng - 1);
   return T_CONSTANT;
 }
 
  /** Regola identificare una costante tra apici */
 <ST_IN_SCRIPTING>(["]({CONST_LABEL})["]) {
-  /*elimina i doppi apici, restituendo il nome della costante.*/
-  char *s = ( char * )malloc( ( strlen( yytext ) - 1 )*sizeof( char ) );
-  int j = 0;
-  int i;
-  for( i = 1; i < strlen( yytext ) - 1; i++) {
-    s[j] = yytext[i];
-    j++;
-  }
-  s[strlen( s )] = '\0';
-  yylval.id = s;
+  yylval.id = nullTerminateTheLexem(yytext, 1 , yyleng - 1);
   return T_CONSTANT;
 }
 
  /** Regola identificare una stringa di letterali tra virgolette */
 <ST_IN_SCRIPTING>(["]([^$_"\\]|("\\".))*["]) {
- yylval.id = escapeNewline(yytext);
- //char *s=( char * )malloc( ( strlen( yytext ) - 1 )*sizeof( char ) );
- //yylval.id = s;
- return T_CONSTANT_ENCAPSED_STRING;
+  yylval.id = escapeNewline(yytext);
+  return T_CONSTANT_ENCAPSED_STRING;
 }
 
  /** Regola identificare una stringa costante di letterali tra singolo apice */
 <ST_IN_SCRIPTING>([']([^'\\]|("\\".))*[']) {
-  /*sostituisce ai singli apici i doppi apici, questo per evitare problemi 
-    con la definizione ( parola chiave define ) delle costanti.*/
-  char *s=( char * )malloc( ( strlen( yytext ) - 1 )*sizeof( char ) );
-  int j = 1;
+  /* sostituisce i singli apici con le virgolette per evitare problemi 
+     con la definizione delle costanti. */
+  char * s = strdup(yytext);
   s[0] = '"';
-  int i;
-  for( i = 1; i < strlen( yytext ) - 1; i++) {
-    s[j] = yytext[ i ];
-    j++;
-  }
-  s[j] = '"';
-  s[strlen( s )] = '\0';
-
+  s[yyleng-1] = '"';
   yylval.id = s;
   return T_CONSTANT_ENCAPSED_STRING;
 }
@@ -570,13 +519,7 @@ lineno++;
 
  /** Regola per letterali validi all'interno di una stringa */
 <ST_DOUBLE_QUOTES>{ESCAPED_AND_WHITESPACE} {
-  /*elimina gli spazi bianchi, questo per evitare che in traduzione compaiano spazi bianchi indesiderati.*/
-  char *s= ( char * )strdup( yytext );
-  if( strcmp( s, " " ) != 0 )
-    yylval.id = s;
-  else
-    yylval.id = "";
-
+  yylval.id = strdup( yytext );
   return T_ENCAPSED_AND_WHITESPACE;
 }
 
@@ -590,11 +533,18 @@ lineno++;
   return T_ENCAPSED_AND_WHITESPACE;
 }
 
+ /** Regola per includere il simbolo speciale $ in una stringa */
 <ST_DOUBLE_QUOTES>"$"[^a-zA-Z_\x7f-\xff{] {
   if (yyleng == 2) {
     yyless(1);
   }
   return T_CHARACTER;
+}
+
+  /** Regola per il ritono di un numero nel contesto di una stringa */
+<ST_DOUBLE_QUOTES>{LNUM} { 
+  yylval.id = nullTerminateTheLexem(yytext,0,yyleng);
+  return T_NUM_STRING;
 }
 
  /** Regola per token quali [,],{,},$ che possono comparire in una stringa */
@@ -623,27 +573,31 @@ lineno++;
 }
 
 <ST_DOUBLE_QUOTES>"\\x"[0-9A-Fa-f]{1,2} {
-return T_CHARACTER;
+  return T_CHARACTER;
 }
 
 <ST_DOUBLE_QUOTES>["] {
-BEGIN(ST_IN_SCRIPTING);
-return '\"';
+  BEGIN(ST_IN_SCRIPTING);
+  return '\"';
 }
 
 <ST_SINGLE_QUOTE>['] {
-BEGIN(ST_IN_SCRIPTING);
-return '\'';
+  BEGIN(ST_IN_SCRIPTING);
+  return '\'';
 }
 
+ /** Segnalazione di un commento non terminato correttamente */
 <ST_COMMENT,ST_DOC_COMMENT><<EOF>> {
-  printf( "\033[01;33mATTENZIONE: commento iniziato alla riga %d e non terminato.\033[00m\n", comment_start_line );
+  printf( "\n\033[01;33m[WARNING] Riga %d: commento non terminato correttamente.\033[00m\n", comment_start_line );
   return 0;
 }
 
+  /** Ogni carattere che non corrisponde ad una definizione valida (quindi ad un token) viene
+  *   segnalato in fase di compilazione 
+  */
 <ST_IN_SCRIPTING,INITIAL,ST_DOUBLE_QUOTES,ST_SINGLE_QUOTE>{ANY_CHAR} {
-  printf( "\033[01;33mATTENZIONE: carattere inatteso in input '%c' (ASCII=%d) state=%d",yytext[0], yytext[0], YYSTATE );
+  char * res = escapeNewline(yytext);
+  printf( "\n\033[01;33m[WARNING] Riga %d: carattere inatteso '%s', Parsing State '%d'",yylineno, res, YYSTATE );
 }
-
 
 %%

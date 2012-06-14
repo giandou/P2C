@@ -10,7 +10,7 @@ if [ -f "parser.y" ]; then
       echo "symbolTable.h trovato"
 
       if [ -f "inclusioni.h" ]; then
-	echo "symbolTable.h trovato"
+	echo "inclusioni.h trovato"
 	echo ""
 	echo "Avvio della Compilazione"
 # 	mkdir -p output
