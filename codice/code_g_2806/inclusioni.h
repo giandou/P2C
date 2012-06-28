@@ -534,9 +534,11 @@ void genIntestazione ( FILE* f_ptr )
 
 /** Procedura di avvio della scrittura nel file di traduzione */
 void avviaScritturaFileTraduzione(){
-  eliminaFile(f_ptr); 
-  apriFileTraduzione(); 
-  genIntestazione(f_ptr);
+  if(!f_ptr){
+    eliminaFile(f_ptr); 
+    apriFileTraduzione(); 
+    genIntestazione(f_ptr);
+  }
 }
 
 
