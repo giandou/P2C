@@ -110,25 +110,24 @@ epsilon: /* vuoto */
  ;
 
 state_inscripting:
-  T_INIT { avviaScritturaFileTraduzione(); } 
-  | possible_html
+  /*T_INIT { avviaScritturaFileTraduzione(); } 
+  | */possible_html
   ;
   
 end:
- T_FINAL 
- | T_FINAL possible_html
- | T_END_OF_FILE { insertNewLine(f_ptr); fprintf( f_ptr, "}" ); YYABORT; }
+ T_FINAL { ntab--; }
+ | T_FINAL { ntab--; } possible_html
+/*  | T_END_OF_FILE { insertNewLine(f_ptr); fprintf( f_ptr, "}" ); YYABORT; } */
  ;
 
 possible_html:
-   T_INLINE_HTML 
+   T_INIT { avviaScritturaFileTraduzione(); } 
+   |T_INLINE_HTML 
     { 
-      if(!f_ptr){ 
-	avviaScritturaFileTraduzione(); 
-      }  
+      avviaScritturaFileTraduzione();   
       insInLista(&frasi,$1); 
       printEcho( f_ptr, NULL, frasi); 
-      liberaStrutture( ); 
+      liberaStrutture(); 
       insertNewLine(f_ptr); 
     }
   | possible_html T_INIT
@@ -282,7 +281,7 @@ unticked_statement:
       }
       liberaStrutture( );
     }
- | T_ECHO echo_expr_list 
+ | T_ECHO echo_expr_list error
     {
       yyerror("[ERRORE SINTATTICO]: punto e virgola mancante nella espressione di ECHO. Corretto!");
       printEcho( f_ptr, espressioni, frasi ); liberaStrutture( );
@@ -294,7 +293,8 @@ unticked_statement:
       }
       liberaStrutture( );
     }
- | T_ECHO error ';' { yyerror ( "[ERRORE SINTATTICO]: argomento della funzione ECHO errato" ); liberaStrutture( ); }
+/*  | T_ECHO error ';' { yyerror ( "[ERRORE SINTATTICO]: argomento della funzione ECHO errato" ); liberaStrutture( ); } */
+ | T_ECHO error { yyerror ( "[ERRORE SINTATTICO]: argomento della funzione ECHO errato" ); liberaStrutture( ); }
  | expr ';' {
     if( contaElementi( espressioni ) == 1 )
       printExpression( f_ptr, espressioni );
@@ -824,6 +824,8 @@ void startParsing(char * nomeFile){
     stampaMsg("\n","none");
     // Avvio del parser
     yyparse();
+//chiusura main del file di traduzione
+insertNewLine(f_ptr); fprintf( f_ptr, "}" );
     // Stampa delle ST
     stampaFunctionSymbolTable(0);
     stampaSymbolTable(symbolTable, "MAIN");
