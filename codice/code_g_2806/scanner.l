@@ -14,6 +14,8 @@
   #include <stdio.h>
   #include "parser.h"
 
+  #define yyterminate() return 0
+
 }
 %{
 /** Dichiarazione delle variabili intere definite nelle inclusioni per la gestione degli errori */
@@ -378,7 +380,7 @@ NEWLINE ("\r"|"\n"|"\r\n")
 }
 
  /** Regola per identificare l'inizio di uno script PHP */
-<INITIAL>"<?php"([ \t]|{NEWLINE}) {
+<INITIAL>"<?php"([ \t]|{NEWLINE})* {
   if (yytext[yyleng-1] == '\n') {
     lineno++;
   }
@@ -424,9 +426,13 @@ NEWLINE ("\r"|"\n"|"\r\n")
 }
 
 
- /** Regola per identificare una stringa nello script PHP */
-<ST_IN_SCRIPTING>{LABEL} {
-  yylval.id = ( char * )strdup( yytext );
+ /** Regola per identificare una funzione nello script PHP */
+<ST_IN_SCRIPTING>{LABEL}[(] {
+/* Copy yytext because unput() trashes yytext */
+  char *yycopy = strdup( yytext );
+  unput( '(' );
+  yylval.id = nullTerminateTheLexem(yycopy,0,yyleng-1);
+  free( yycopy );
   return T_FUNCTION_NAME;
 }
 
@@ -654,8 +660,7 @@ NEWLINE ("\r"|"\n"|"\r\n")
 }
  /** Regola per il ritorno del token speciale che indica la fine del file scansionato */
 <INITIAL,ST_IN_SCRIPTING><<EOF>> {
-	BEGIN(INITIAL);
-	return T_END_OF_FILE;
+	yyterminate();
 }
 
 
